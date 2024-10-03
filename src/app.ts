@@ -73,7 +73,7 @@ io.on('connection', (socket) => {
 });
 
 app.get('/', (req: Request, res: Response) => {
-  res.send({ message: 'Hello world' });
+  res.send({ message: 'Hello! \n Welcome to the multitenant metering system api server.' });
 });
 
 interface LoginRequestBody {
