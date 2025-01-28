@@ -15,20 +15,22 @@ EnergyMonitor emon2;
 Preferences preferences;
 
 // Define the width and height of the OLED display
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+// #define SCREEN_WIDTH 128
+// #define SCREEN_HEIGHT 64
 
 // I2C address for the OLED display (commonly 0x3C)
-#define OLED_ADDR 0x3C
+// #define OLED_ADDR 0x3C
 
-#define TENANT1_PIN 2 // Define GPIO pin for Relay 1
-#define TENANT2_PIN 4 // Define GPIO pin for Relay 2
-#define SENSOR_1_IN                                                            \
-  34 // pin where the OUT pin from sensor is connected on Arduino
-#define SENSOR_2_IN                                                            \
-  35 // pin where the OUT pin from sensor is connected on Arduino
+#define TENANT1_PIN 12 // Define GPIO pin for Relay 1
+#define TENANT2_PIN 14 // Define GPIO pin for Relay 2
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+#define VOLT_SENSOR_PIN 32 // voltage sensor pin
+
+#define CUR_SENSOR_1_IN 33 // pin where the OUT pin from 1st tenant current sensor is connected on Arduino
+#define CUR_SENSOR_2_IN 25 // pin where the OUT pin from 2nd tenant current sensor is connected on Arduino
+
+
+// Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 int mVperAmp = 66; // this the 5A version of the ACS712 -use 100 for 20A Module
                    // and 66 for 30A Module
@@ -46,12 +48,12 @@ bool tenant2_on = false;
 double offset1 = 0.00;
 double offset2 = 0.00;
 
-const char *ssid = "omeiza";
-const char *pass = "omeiza112";
+const char *ssid = "SEC-IOT";
+const char *pass = "SEC-IOT112";
 unsigned long lastMillis = millis();
 
 // define the url of the server
-char *serverName = "http://192.168.137.1:5000";
+char *serverName = "https://mutli-tenant-meter-api.onrender.com";
 
 // create a variable that we will use to store timestamp
 char timestamp[30];
@@ -162,23 +164,23 @@ void setup() {
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
-  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ; // Don't proceed, loop forever
-  }
+  // if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+  //   Serial.println(F("SSD1306 allocation failed"));
+  //   for (;;)
+  //     ; // Don't proceed, loop forever
+  // }
 
   // Clear the display
-  display.clearDisplay();
+  // display.clearDisplay();
 
-  // Set text size and color
-  display.setTextSize(1);              // Can adjust size (1-8)
-  display.setTextColor(SSD1306_WHITE); // White text
+  // // Set text size and color
+  // display.setTextSize(1);              // Can adjust size (1-8)
+  // display.setTextColor(SSD1306_WHITE); // White text
 
   // Display a welcome message
-  display.setCursor(0, 0);
-  display.println("Hello, ESP32!");
-  display.display(); // Output to the screen
+  // display.setCursor(0, 0);
+  // display.println("Hello, ESP32!");
+  // display.display(); // Output to the screen
 
   pinMode(TENANT1_PIN, OUTPUT); // Set the relay pins as outputs
   pinMode(TENANT2_PIN, OUTPUT);
@@ -258,11 +260,12 @@ void calibrateCurrOffsets() {
   Serial.print("offset 2:   ");
   Serial.println(offset2);
 
-  float initialAmpsRMS1 = getAmpsRMS(SENSOR_1_IN, offset1);
-  float initialAmpsRMS2 = getAmpsRMS(SENSOR_2_IN, offset2);
+  float initialAmpsRMS1 = getAmpsRMS(CUR_SENSOR_1_IN, offset1);
+  float initialAmpsRMS2 = getAmpsRMS(CUR_SENSOR_2_IN, offset2);
+
   // Determine offsets to ensure RMS current readings are zero
-  offset1 += initialAmpsRMS1 +0.300;
-  offset2 += initialAmpsRMS2 + 0.300;
+  offset1 += initialAmpsRMS1;
+  offset2 += initialAmpsRMS2 + 0.200;
   Serial.print("after. offset 1:   ");
   Serial.print(offset1);
   Serial.print("\t");
@@ -271,12 +274,12 @@ void calibrateCurrOffsets() {
 }
 
 void sendComplexData() {
-  emon.calcVI(20, 2000);
+  emon.calcVI(VOLT_SENSOR_PIN,  2000);
 
   // Calculate the RMS current and take the absolute value to avoid negative
   // values
-  if (tenant1_on && emon.Vrms > 120) {
-    AmpsRMS = getAmpsRMS(SENSOR_1_IN, offset1);
+  if (tenant1_on && emon.Vrms > 5.99) {
+    AmpsRMS = getAmpsRMS(CUR_SENSOR_1_IN, offset1);
     // if ampsrms is negetive, return 0
     if (AmpsRMS < 0) {
       AmpsRMS = 0;
@@ -291,8 +294,10 @@ void sendComplexData() {
   } else {
     AmpsRMS = 0;
   }
-  if (tenant2_on && emon.Vrms > 120) {
-    AmpsRMS2 = abs(getAmpsRMS(SENSOR_2_IN, offset2));
+  if (tenant2_on && emon.Vrms > 5.99) {
+    AmpsRMS2 = abs(getAmpsRMS(CUR_SENSOR_2_IN, offset2));
+
+    #define VOLT_SENSOR_1_PIN 
 
     consumedkWh2 = consumedkWh2 + (emon.Vrms * AmpsRMS2) *
                                       (millis() - lastMillis) / 3600000000.0;
@@ -406,7 +411,7 @@ void sendComplexData() {
   // Nested object for power data
   JsonObject powerData = jsonDoc.createNestedObject("power_data");
   powerData["current"] = AmpsRMS;
-  powerData["power"] = AmpsRMS * emon.VRMS; // Calculated power consumption
+  powerData["power"] = AmpsRMS * emon.Vrms; // Calculated power consumption
   powerData["energy_consumed"] = consumedkWh; // consumedkWh
   tenant1["data"] = powerData;
 
