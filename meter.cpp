@@ -278,7 +278,7 @@ void sendComplexData() {
 
   // Calculate the RMS current and take the absolute value to avoid negative
   // values
-  if (tenant1_on && emon.Vrms > 5.99) {
+  if (tenant1_on && emon.Vrms > 120) {
     AmpsRMS = getAmpsRMS(CUR_SENSOR_1_IN, offset1);
     // if ampsrms is negetive, return 0
     if (AmpsRMS < 0) {
@@ -294,7 +294,7 @@ void sendComplexData() {
   } else {
     AmpsRMS = 0;
   }
-  if (tenant2_on && emon.Vrms > 5.99) {
+  if (tenant2_on && emon.Vrms > 120) {
     AmpsRMS2 = abs(getAmpsRMS(CUR_SENSOR_2_IN, offset2));
 
     #define VOLT_SENSOR_1_PIN 
